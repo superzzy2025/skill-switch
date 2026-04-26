@@ -201,7 +201,7 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
         return element;
     }
 
-    getChildren(element?: SkillTreeItem): ProviderResult<SkillTreeItem[]> {
+    async getChildren(element?: SkillTreeItem): Promise<SkillTreeItem[]> {
         if (!this.data) {
             return [];
         }
@@ -288,16 +288,16 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
         }
 
         if (element instanceof DesignDocHeaderItem) {
-            return this.buildDesignDocItems();
+            return await this.buildDesignDocItems();
         }
 
         if (element instanceof DesignDocItem) {
             const docDir = path.join(this.designDocsPath, element.docName);
-            return this.getDirChildren(element.docName, docDir);
+            return await this.getDirChildren(element.docName, docDir);
         }
 
         if (element instanceof DesignDocFolderItem) {
-            return this.getDirChildren(element.docName, element.folderPath);
+            return await this.getDirChildren(element.docName, element.folderPath);
         }
 
         return [];
