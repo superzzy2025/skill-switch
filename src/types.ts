@@ -34,6 +34,14 @@ export type Language = 'en' | 'zh';
 
 /** Global config stored in config.json */
 export interface AppConfig {
+    /** Per-IDE target paths: ideKey → absolute skill sync path */
+    targetPaths: Record<string, string>;
+    storagePath: string;
+    language: Language;
+}
+
+/** Legacy config format (for migration) */
+export interface LegacyAppConfig {
     targetPath: string;
     storagePath: string;
     language: Language;

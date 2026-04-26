@@ -6,17 +6,23 @@ export class SettingsWebviewPanel {
     public static currentPanel: SettingsWebviewPanel | undefined;
     private readonly panel: vscode.WebviewPanel;
     private config: AppConfig;
+    private currentIdeKey: string;
+    private currentIdeName: string;
     private disposables: vscode.Disposable[] = [];
     private onSaved: ((config: AppConfig) => Promise<void>) | undefined;
 
     public static async create(
         extensionUri: vscode.Uri,
         config: AppConfig,
+        currentIdeKey: string,
+        currentIdeName: string,
         onSaved: (config: AppConfig) => Promise<void>,
     ): Promise<SettingsWebviewPanel> {
         // If panel already exists, reveal it
         if (SettingsWebviewPanel.currentPanel) {
             SettingsWebviewPanel.currentPanel.config = config;
+            SettingsWebviewPanel.currentPanel.currentIdeKey = currentIdeKey;
+            SettingsWebviewPanel.currentPanel.currentIdeName = currentIdeName;
             SettingsWebviewPanel.currentPanel.onSaved = onSaved;
             SettingsWebviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.One);
             SettingsWebviewPanel.currentPanel.updateWebview();
@@ -38,6 +44,8 @@ export class SettingsWebviewPanel {
             panel,
             extensionUri,
             config,
+            currentIdeKey,
+            currentIdeName,
             onSaved,
         );
 
@@ -48,10 +56,14 @@ export class SettingsWebviewPanel {
         panel: vscode.WebviewPanel,
         _extensionUri: vscode.Uri,
         config: AppConfig,
+        currentIdeKey: string,
+        currentIdeName: string,
         onSaved: (config: AppConfig) => Promise<void>,
     ) {
         this.panel = panel;
         this.config = config;
+        this.currentIdeKey = currentIdeKey;
+        this.currentIdeName = currentIdeName;
         this.onSaved = onSaved;
 
         this.panel.iconPath = new vscode.ThemeIcon('settings-gear');
@@ -88,20 +100,20 @@ export class SettingsWebviewPanel {
     }
 
     private async handleBrowseTargetPath(): Promise<void> {
+        const currentPath = this.config.targetPaths[this.currentIdeKey] ?? '';
         const uris = await vscode.window.showOpenDialog({
             canSelectMany: false,
             canSelectFiles: false,
             canSelectFolders: true,
-            title: t('targetPathLabel'),
-            defaultUri: vscode.Uri.file(this.config.targetPath),
+            title: `${t('targetPathLabel')} - ${this.currentIdeName}`,
+            defaultUri: currentPath ? vscode.Uri.file(currentPath) : undefined,
         });
         if (uris && uris.length > 0) {
-            let selectedPath = uris[0].fsPath;
-            // Ensure trailing separator
-            if (!selectedPath.endsWith('/') && !selectedPath.endsWith('\\')) {
-                selectedPath += '/';
-            }
-            this.config = { ...this.config, targetPath: selectedPath };
+            const selectedPath = uris[0].fsPath;
+            this.config = {
+                ...this.config,
+                targetPaths: { ...this.config.targetPaths, [this.currentIdeKey]: selectedPath },
+            };
             this.panel.webview.postMessage({ command: 'updateTargetPath', value: selectedPath });
         }
     }
@@ -121,23 +133,24 @@ export class SettingsWebviewPanel {
         }
     }
 
-    private async handleSave(data: { targetPath: string; storagePath: string; language: Language }): Promise<void> {
+    private async handleSave(data: { targetPath: string; storagePath: string; language: string }): Promise<void> {
+        // Update config with webview input values
         this.config = {
-            targetPath: data.targetPath,
+            ...this.config,
+            targetPaths: { ...this.config.targetPaths, [this.currentIdeKey]: data.targetPath },
             storagePath: data.storagePath,
-            language: data.language,
+            language: data.language as Language,
         };
-
         if (this.onSaved) {
             await this.onSaved(this.config);
         }
-
         vscode.window.showInformationMessage(t('msgSettingsSaved'));
     }
 
     private getHtmlForWebview(): string {
         const lang = getCurrentLanguage();
         const config = this.config;
+        const currentTargetPath = config.targetPaths[this.currentIdeKey] ?? '';
 
         return /*html*/ `
 <!DOCTYPE html>
@@ -161,11 +174,7 @@ export class SettingsWebviewPanel {
             --fg-muted: var(--vscode-disabledForeground);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: var(--vscode-font-family);
@@ -176,238 +185,99 @@ export class SettingsWebviewPanel {
         }
 
         .title-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
+            display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
         }
-
-        .title-row .icon {
-            width: 24px;
-            height: 24px;
-            color: var(--vscode-blue);
-        }
-
-        .title-row h1 {
-            font-size: 24px;
-            font-weight: 700;
-        }
+        .title-row .icon { width: 24px; height: 24px; color: var(--vscode-blue); }
+        .title-row h1 { font-size: 24px; font-weight: 700; }
 
         .section {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 24px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 8px; padding: 20px; margin-bottom: 24px;
         }
 
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 4px;
-        }
-
-        .section-header .icon {
-            width: 16px;
-            height: 16px;
-            color: var(--vscode-blue);
-        }
-
-        .section-header h2 {
-            font-size: 14px;
-            font-weight: 600;
-        }
+        .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .section-header .icon { width: 16px; height: 16px; color: var(--vscode-blue); }
+        .section-header h2 { font-size: 14px; font-weight: 600; }
 
         .section-desc {
-            font-size: 11px;
-            font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
-            color: var(--fg-secondary);
-            margin-bottom: 16px;
+            font-size: 11px; font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
+            color: var(--fg-secondary); margin-bottom: 16px;
         }
 
-        .divider {
-            height: 1px;
-            background: var(--border);
-            margin: 12px 0;
-        }
+        .divider { height: 1px; background: var(--border); margin: 12px 0; }
 
-        .field-group {
-            margin-bottom: 16px;
+        .ide-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 600; color: var(--vscode-blue);
+            background: var(--vscode-blue-muted); padding: 3px 10px; border-radius: 4px;
+            margin-bottom: 12px;
         }
+        .ide-badge .icon { width: 14px; height: 14px; }
 
-        .field-group:last-child {
-            margin-bottom: 0;
-        }
+        .field-group { margin-bottom: 16px; }
+        .field-group:last-child { margin-bottom: 0; }
 
         .field-label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 2px;
+            display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
         }
-
-        .field-label .icon {
-            width: 12px;
-            height: 12px;
-            color: var(--fg-secondary);
-        }
-
-        .field-label label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--fg-secondary);
-        }
+        .field-label .icon { width: 12px; height: 12px; color: var(--fg-secondary); }
+        .field-label label { font-size: 12px; font-weight: 600; color: var(--fg-secondary); }
 
         .field-hint {
-            font-size: 10px;
-            font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
-            color: var(--fg-muted);
-            margin-bottom: 6px;
+            font-size: 10px; font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
+            color: var(--fg-muted); margin-bottom: 6px;
         }
 
-        .input-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            height: 32px;
-        }
-
+        .input-row { display: flex; align-items: center; gap: 8px; height: 32px; }
         .input-row input {
-            flex: 1;
-            height: 32px;
-            padding: 0 10px;
+            flex: 1; height: 32px; padding: 0 10px;
             font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
-            font-size: 12px;
-            color: var(--fg-primary);
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            outline: none;
+            font-size: 12px; color: var(--fg-primary); background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 4px; outline: none;
         }
-
-        .input-row input:focus {
-            border-color: var(--vscode-blue);
-        }
+        .input-row input:focus { border-color: var(--vscode-blue); }
 
         .browse-btn {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 8px;
+            display: flex; align-items: center; gap: 4px; padding: 3px 8px;
             font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--fg-secondary);
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            cursor: pointer;
-            white-space: nowrap;
+            font-size: 10px; font-weight: 600; color: var(--fg-secondary);
+            background: transparent; border: 1px solid var(--border); border-radius: 3px;
+            cursor: pointer; white-space: nowrap; height: 32px;
         }
-
         .browse-btn:hover {
-            background: var(--vscode-blue-muted);
-            color: var(--vscode-blue);
-            border-color: var(--vscode-blue);
+            background: var(--vscode-blue-muted); color: var(--vscode-blue); border-color: var(--vscode-blue);
         }
+        .browse-btn .icon { width: 12px; height: 12px; }
 
-        .browse-btn .icon {
-            width: 12px;
-            height: 12px;
-        }
-
-        .select-wrapper {
-            position: relative;
-            width: 100%;
-            height: 32px;
-        }
-
+        .select-wrapper { position: relative; width: 100%; height: 32px; }
         .select-wrapper select {
-            width: 100%;
-            height: 32px;
-            padding: 0 28px 0 10px;
-            font-family: var(--vscode-font-family);
-            font-size: 12px;
-            color: var(--fg-primary);
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            outline: none;
-            appearance: none;
-            -webkit-appearance: none;
-            cursor: pointer;
+            width: 100%; height: 32px; padding: 0 28px 0 10px;
+            font-family: var(--vscode-font-family); font-size: 12px;
+            color: var(--fg-primary); background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 4px; outline: none;
+            appearance: none; -webkit-appearance: none; cursor: pointer;
         }
-
-        .select-wrapper select:focus {
-            border-color: var(--vscode-blue);
-        }
-
+        .select-wrapper select:focus { border-color: var(--vscode-blue); }
         .select-wrapper::after {
-            content: '';
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 0;
-            height: 0;
-            border-left: 4px solid transparent;
-            border-right: 4px solid transparent;
-            border-top: 5px solid var(--fg-secondary);
+            content: ''; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            width: 0; height: 0; border-left: 4px solid transparent;
+            border-right: 4px solid transparent; border-top: 5px solid var(--fg-secondary);
             pointer-events: none;
         }
 
         .language-hint {
-            font-size: 10px;
-            font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
-            color: var(--fg-muted);
-            margin-top: 6px;
+            font-size: 10px; font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
+            color: var(--fg-muted); margin-top: 6px;
         }
 
-        .btn-row {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 16px;
-            padding-top: 16px;
-        }
+        .btn-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 16px; }
 
-        .btn {
-            padding: 8px 20px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            outline: none;
-        }
-
-        .btn-cancel {
-            color: var(--fg-secondary);
-            background: transparent;
-            border: 1px solid var(--border);
-        }
-
-        .btn-cancel:hover {
-            background: var(--vscode-blue-muted);
-        }
-
-        .btn-save {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: #fff;
-            background: var(--vscode-blue);
-        }
-
-        .btn-save:hover {
-            background: var(--vscode-blue-hover);
-        }
-
-        .btn-save .icon {
-            width: 14px;
-            height: 14px;
-        }
+        .btn { padding: 8px 20px; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; outline: none; }
+        .btn-cancel { color: var(--fg-secondary); background: transparent; border: 1px solid var(--border); }
+        .btn-cancel:hover { background: var(--vscode-blue-muted); }
+        .btn-save { display: flex; align-items: center; gap: 6px; color: #fff; background: var(--vscode-blue); }
+        .btn-save:hover { background: var(--vscode-blue-hover); }
+        .btn-save .icon { width: 14px; height: 14px; }
     </style>
 </head>
 <body>
@@ -418,55 +288,51 @@ export class SettingsWebviewPanel {
         <h1>${t('settingsTitle')}</h1>
     </div>
 
-    <!-- Path Configuration Section -->
+    <!-- Target Path Section -->
     <div class="section">
         <div class="section-header">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
-            <h2>${t('pathConfigTitle')}</h2>
+            <h2>${t('targetPathLabel')}</h2>
         </div>
-        <div class="section-desc">${t('pathConfigDesc')}</div>
+        <div class="section-desc">${t('targetPathHint')}</div>
         <div class="divider"></div>
-
-        <!-- Target Path -->
-        <div class="field-group">
-            <div class="field-label">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
-                </svg>
-                <label>${t('targetPathLabel')}</label>
-            </div>
-            <div class="field-hint">${t('targetPathHint')}</div>
-            <div class="input-row">
-                <input type="text" id="targetPath" value="${this.escapeHtml(config.targetPath)}" />
-                <button class="browse-btn" onclick="browseTargetPath()">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    ${t('browseBtn')}
-                </button>
-            </div>
+        <div class="ide-badge">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            ${this.escapeHtml(this.currentIdeName)}
         </div>
-
-        <!-- Storage Path -->
-        <div class="field-group">
-            <div class="field-label">
+        <div class="input-row">
+            <input type="text" id="targetPath" value="${this.escapeHtml(currentTargetPath)}" />
+            <button class="browse-btn" onclick="browseTargetPath()">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <label>${t('storagePathLabel')}</label>
-            </div>
-            <div class="field-hint">${t('storagePathHint')}</div>
-            <div class="input-row">
-                <input type="text" id="storagePath" value="${this.escapeHtml(config.storagePath)}" />
-                <button class="browse-btn" onclick="browseStoragePath()">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    ${t('browseBtn')}
-                </button>
-            </div>
+                ${t('browseBtn')}
+            </button>
+        </div>
+    </div>
+
+    <!-- Storage Path Section -->
+    <div class="section">
+        <div class="section-header">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><line x1="2" y1="12" x2="22" y2="12"/>
+            </svg>
+            <h2>${t('storagePathLabel')}</h2>
+        </div>
+        <div class="section-desc">${t('storagePathHint')}</div>
+        <div class="divider"></div>
+        <div class="input-row">
+            <input type="text" id="storagePath" value="${this.escapeHtml(config.storagePath)}" />
+            <button class="browse-btn" onclick="browseStoragePath()">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                ${t('browseBtn')}
+            </button>
         </div>
     </div>
 
@@ -480,7 +346,6 @@ export class SettingsWebviewPanel {
         </div>
         <div class="section-desc">${t('languageDesc')}</div>
         <div class="divider"></div>
-
         <div class="field-group">
             <div class="field-label">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

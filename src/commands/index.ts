@@ -107,7 +107,7 @@ export class CommandRegistry {
     private async refresh(): Promise<void> {
         // Re-sync active profile to target path
         const state = this.stateManager.getState();
-        if (state.activeProfile) {
+        if (state.activeProfile && this.stateManager.hasTargetPath()) {
             try {
                 const profiles = await this.profileManager.listProfiles();
                 const activeProfile = profiles.find(p => p.meta.id === state.activeProfile);
@@ -864,14 +864,18 @@ export class CommandRegistry {
 
     private async openSettings(): Promise<void> {
         const config = this.stateManager.getConfig();
+        const currentIdeKey = this.stateManager.getCurrentIdeKey();
+        const currentIdeName = this.stateManager.getCurrentIdeName();
 
         await SettingsWebviewPanel.create(
             this.extensionUri,
             config,
+            currentIdeKey,
+            currentIdeName,
             async (newConfig) => {
                 const oldLanguage = this.stateManager.getConfig().language;
                 await this.stateManager.updateConfig({
-                    targetPath: newConfig.targetPath,
+                    targetPaths: newConfig.targetPaths,
                     storagePath: newConfig.storagePath,
                     language: newConfig.language,
                 });
@@ -1000,6 +1004,18 @@ export class CommandRegistry {
     // --- Sync Helper ---
 
     async doSync(): Promise<void> {
+        if (!this.stateManager.hasTargetPath()) {
+            vscode.window.showWarningMessage(
+                t('msgNoTargetPath', this.stateManager.getCurrentIdeName()),
+                t('msgOpenSettings')
+            ).then(action => {
+                if (action === t('msgOpenSettings')) {
+                    vscode.commands.executeCommand('skillSwitch.openSettings');
+                }
+            });
+            return;
+        }
+
         const state = this.stateManager.getState();
         const profiles = await this.profileManager.listProfiles();
         const activeProfile = profiles.find(p => p.meta.id === state.activeProfile);

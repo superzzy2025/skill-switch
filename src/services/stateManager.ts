@@ -1,10 +1,11 @@
 import * as path from 'path';
 import * as os from 'os';
-import { AppConfig, AppState } from '../types';
+import { AppConfig, AppState, LegacyAppConfig } from '../types';
 import { readJsonFile, writeJsonFile, ensureDir } from '../utils/fileUtils';
+import { detectCurrentIde, getIdeDisplayName } from '../utils/ideDetector';
 
 const DEFAULT_CONFIG: AppConfig = {
-    targetPath: path.join(os.homedir(), '.claude', 'skills'),
+    targetPaths: {},
     storagePath: path.join(os.homedir(), '.skill-switch'),
     language: 'en',
 };
@@ -17,15 +18,39 @@ const DEFAULT_STATE: AppState = {
 };
 
 export class StateManager {
-    private config: AppConfig = DEFAULT_CONFIG;
+    private config: AppConfig = { ...DEFAULT_CONFIG, targetPaths: {} };
     private state: AppState = { ...DEFAULT_STATE };
+    private currentIdeKey: string = 'unknown';
 
     /** Initialize: load or create config and state */
-    async initialize(): Promise<void> {
+    async initialize(appName?: string): Promise<void> {
+        // Detect current IDE
+        this.currentIdeKey = appName ? detectCurrentIde(appName) : 'unknown';
+
         // Load config from fixed default location
-        const configPath = path.join(DEFAULT_CONFIG.storagePath, 'config.json');
-        const loadedConfig = await readJsonFile<AppConfig>(configPath);
-        this.config = loadedConfig ?? { ...DEFAULT_CONFIG };
+        const configPath = this.getConfigPath();
+        const rawConfig = await readJsonFile<Record<string, unknown>>(configPath);
+
+        if (rawConfig) {
+            // Check for legacy config with targetPath (string) instead of targetPaths (object)
+            if (typeof (rawConfig as any).targetPath === 'string' && !(rawConfig as any).targetPaths) {
+                // Migrate from legacy format: assign old targetPath to current IDE
+                const legacy = rawConfig as unknown as LegacyAppConfig;
+                this.config = {
+                    targetPaths: { [this.currentIdeKey]: legacy.targetPath },
+                    storagePath: legacy.storagePath,
+                    language: legacy.language,
+                };
+            } else {
+                this.config = {
+                    targetPaths: (rawConfig as any).targetPaths ?? {},
+                    storagePath: (rawConfig as any).storagePath ?? DEFAULT_CONFIG.storagePath,
+                    language: (rawConfig as any).language ?? DEFAULT_CONFIG.language,
+                };
+            }
+        } else {
+            this.config = { ...DEFAULT_CONFIG, targetPaths: {} };
+        }
 
         // Ensure directories exist (profiles/extras/design-docs go to configured storagePath)
         await ensureDir(this.getStoragePath());
@@ -43,10 +68,36 @@ export class StateManager {
         await this.saveState();
     }
 
+    /** Get the current IDE key */
+    getCurrentIdeKey(): string {
+        return this.currentIdeKey;
+    }
+
+    /** Get the current IDE display name */
+    getCurrentIdeName(): string {
+        return getIdeDisplayName(this.currentIdeKey);
+    }
+
+    /** Check if the current IDE has a target path configured */
+    hasTargetPath(): boolean {
+        return !!this.config.targetPaths[this.currentIdeKey]?.trim();
+    }
+
     // --- Config getters ---
 
     getConfig(): AppConfig {
         return this.config;
+    }
+
+    /** Get the target path for the current IDE. Returns empty string if not configured. */
+    getTargetPath(): string {
+        return this.config.targetPaths[this.currentIdeKey] ?? '';
+    }
+
+    /** Set the target path for the current IDE */
+    async setTargetPath(targetPath: string): Promise<void> {
+        this.config.targetPaths[this.currentIdeKey] = targetPath;
+        await this.saveConfig();
     }
 
     /** Update config fields and persist */
@@ -73,10 +124,6 @@ export class StateManager {
 
     getDesignDocsPath(): string {
         return path.join(this.config.storagePath, 'design-docs');
-    }
-
-    getTargetPath(): string {
-        return this.config.targetPath;
     }
 
     private getStatePath(): string {

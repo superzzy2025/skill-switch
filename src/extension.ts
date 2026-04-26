@@ -13,7 +13,7 @@ import { pathExists, listSkillDirectories } from './utils/fileUtils';
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // Initialize services
     const stateManager = new StateManager();
-    await stateManager.initialize();
+    await stateManager.initialize(vscode.env.appName);
 
     // Initialize i18n with saved language
     initI18n(stateManager.getConfig().language);
@@ -56,7 +56,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
 
         // Re-sync after checkbox change (silent - no notification)
-        {
+        if (stateManager.hasTargetPath()) {
             const currentState = stateManager.getState();
             try {
                 await syncService.sync(
@@ -105,7 +105,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Auto-import skills from targetPath if no profiles exist
     let allProfiles = await profileManager.listProfiles();
     let profiles = allProfiles.filter(p => !(p.meta as any).isBackup);
-    if (profiles.length === 0) {
+    if (profiles.length === 0 && stateManager.hasTargetPath()) {
         const targetPath = stateManager.getTargetPath();
         const count = await importSkillsFromTarget(
             profileManager,
@@ -142,6 +142,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         statusBarItem.text = `$(sparkle) ${active.meta.name} | ${enabledSkillCount}${extraPart}`;
     } else {
         statusBarItem.text = `$(sparkle) ${t('msgNoProfileActive')}`;
+    }
+
+    // First-run guidance: prompt to configure target path if current IDE has none
+    if (!stateManager.hasTargetPath()) {
+        const action = await vscode.window.showWarningMessage(
+            t('msgNoTargetPath', stateManager.getCurrentIdeName()),
+            t('msgOpenSettings')
+        );
+        if (action === t('msgOpenSettings')) {
+            vscode.commands.executeCommand('skillSwitch.openSettings');
+        }
     }
 
     // First-run guidance: show welcome if still no profiles

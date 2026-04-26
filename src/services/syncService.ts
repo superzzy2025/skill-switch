@@ -19,6 +19,11 @@ export class SyncService {
         targetPath: string,
         state: AppState
     ): Promise<{ skillCount: number; extraCount: number }> {
+        // Guard: skip sync if target path is not configured
+        if (!targetPath || !targetPath.trim()) {
+            return { skillCount: 0, extraCount: 0 };
+        }
+
         // If no active profile, just clear the target
         if (!state.activeProfile) {
             await clearDirRecursive(targetPath);
