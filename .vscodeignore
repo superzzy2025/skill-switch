@@ -1,0 +1,16 @@
+# Source and dev files
+src/
+tsconfig.json
+.gitignore
+
+# Documentation (keep README, CHANGELOG and LICENSE for the package)
+docs/
+
+# Dependencies
+node_modules/
+
+# VS Code settings
+.vscode/
+
+# Source maps (optional: remove to reduce package size)
+out/**/*.map
