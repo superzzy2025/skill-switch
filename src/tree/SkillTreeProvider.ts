@@ -280,10 +280,11 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
         }
 
         if (element instanceof PermanentHeaderItem) {
+            const enabledExtras = this.data!.state.enabledExtras;
             return this.data.extras.map(({ filename, meta }) => new PermanentSkillItem(
                 filename,
                 meta,
-                this.data!.state.enabledExtras.includes(filename)
+                enabledExtras.includes(filename)
             ));
         }
 

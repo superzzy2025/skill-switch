@@ -20,31 +20,46 @@ export interface ExtrasMeta {
     skills: Record<string, ExtraSkillMeta>;  // key = filename
 }
 
-/** Runtime state stored in state.json */
+/** Runtime state stored in ide/{ideKey}/state.json — fully per-IDE */
 export interface AppState {
     activeProfile: string;
     /** Per-profile disabled skill list. Key = profileId, Value = array of disabled skill filenames */
     disabledProfileSkills: Record<string, string[]>;
+    /** Enabled extra skill filenames */
     enabledExtras: string[];
+    /** Sidebar collapse state. Key = profileId, Value = collapsed */
     sidebarCollapsed: Record<string, boolean>;
 }
 
 /** Supported display languages */
 export type Language = 'en' | 'zh';
 
-/** Global config stored in config.json */
-export interface AppConfig {
-    /** Per-IDE target paths: ideKey → absolute skill sync path */
-    targetPaths: Record<string, string>;
+/** Global config stored in config.json — shared across all IDEs */
+export interface GlobalConfig {
     storagePath: string;
     language: Language;
 }
 
-/** Legacy config format (for migration) */
-export interface LegacyAppConfig {
+/** Per-IDE config stored in ide/{ideKey}/config.json */
+export interface IdeConfig {
+    /** Target path for skill sync */
     targetPath: string;
+}
+
+/** Legacy global config format (for migration) */
+export interface LegacyGlobalConfig {
+    targetPath?: string;
+    targetPaths?: Record<string, string>;
     storagePath: string;
     language: Language;
+}
+
+/** Legacy state format (for migration from old global state.json) */
+export interface LegacyAppState {
+    activeProfile: string;
+    disabledProfileSkills: Record<string, string[]>;
+    enabledExtras: string[];
+    sidebarCollapsed: Record<string, boolean>;
 }
 
 /** A skill entry with its directory name and display metadata */

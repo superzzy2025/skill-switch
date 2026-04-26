@@ -8,7 +8,7 @@ import { ExtraManager } from '../services/extraManager';
 import { DesignDocManager } from '../services/designDocManager';
 import { SyncService } from '../services/syncService';
 import { SkillTreeProvider, ProfileItem, ProfileSkillItem, PermanentSkillItem, BackupProfileItem, DesignDocItem, DesignDocFolderItem } from '../tree/SkillTreeProvider';
-import { AppData, Language } from '../types';
+import { AppData } from '../types';
 import { SettingsWebviewPanel } from '../webview/SettingsWebviewPanel';
 import { t, setLanguage } from '../i18n';
 import { pathExists, listSkillDirectories, copyDirRecursive, ensureDir, removeDir } from '../utils/fileUtils';
@@ -129,9 +129,9 @@ export class CommandRegistry {
     private updateStatusBar(data: AppData): void {
         const active = data.profiles.find(p => p.meta.id === data.state.activeProfile);
         if (active) {
-            const disabledSkills = data.state.disabledProfileSkills[active.meta.id] ?? [];
+            const disabledSkills = this.stateManager.getDisabledProfileSkills(active.meta.id);
             const enabledSkillCount = active.skillFiles.length - disabledSkills.length;
-            const extraCount = data.state.enabledExtras.length;
+            const extraCount = this.stateManager.getEnabledExtras().length;
             const extraPart = extraCount > 0 ? ` + ${extraCount} ${t('sectionPermanentSkills').toLowerCase()}` : '';
             this.statusBarItem.text = `$(sparkle) ${active.meta.name} | ${enabledSkillCount}${extraPart}`;
         } else {
@@ -351,13 +351,12 @@ export class CommandRegistry {
         const tempBackupDir = path.join(os.tmpdir(), 'skill-switch-undo', `${item.profileId}-${item.fileName}`);
         await ensureDir(path.dirname(tempBackupDir));
         await copyDirRecursive(skillDir, tempBackupDir);
-        const wasEnabled = !(this.stateManager.getState().disabledProfileSkills[item.profileId] ?? []).includes(item.fileName);
+        const wasEnabled = !this.stateManager.getDisabledProfileSkills(item.profileId).includes(item.fileName);
 
         await this.profileManager.removeSkill(item.profileId, item.fileName);
 
         // Also remove from disabled list if present
-        const state = this.stateManager.getState();
-        const disabled = state.disabledProfileSkills[item.profileId] ?? [];
+        const disabled = this.stateManager.getDisabledProfileSkills(item.profileId);
         await this.stateManager.setDisabledProfileSkills(
             item.profileId,
             disabled.filter(s => s !== item.fileName)
@@ -383,7 +382,7 @@ export class CommandRegistry {
                 await this.profileManager.addSkill(profileIdRef, fileNameRef, tempBackupDirRef);
                 // Restore enabled/disabled state
                 if (!wasEnabledRef) {
-                    const currentDisabled = this.stateManager.getState().disabledProfileSkills[profileIdRef] ?? [];
+                    const currentDisabled = this.stateManager.getDisabledProfileSkills(profileIdRef);
                     if (!currentDisabled.includes(fileNameRef)) {
                         currentDisabled.push(fileNameRef);
                         await this.stateManager.setDisabledProfileSkills(profileIdRef, currentDisabled);
@@ -467,7 +466,7 @@ export class CommandRegistry {
         const tempBackupDir = path.join(os.tmpdir(), 'skill-switch-undo-extra', item.fileName);
         await ensureDir(path.dirname(tempBackupDir));
         await copyDirRecursive(extraDir, tempBackupDir);
-        const wasEnabled = this.stateManager.getState().enabledExtras.includes(item.fileName);
+        const wasEnabled = this.stateManager.getEnabledExtras().includes(item.fileName);
 
         await this.extraManager.removeExtra(item.fileName);
 
@@ -522,14 +521,13 @@ export class CommandRegistry {
             return;
         }
 
-        const wasEnabled = !(this.stateManager.getState().disabledProfileSkills[item.profileId] ?? []).includes(item.fileName);
+        const wasEnabled = !this.stateManager.getDisabledProfileSkills(item.profileId).includes(item.fileName);
 
         await this.extraManager.addExtra(item.fileName, skillDir);
         await this.profileManager.removeSkill(item.profileId, item.fileName);
 
         // Also remove from disabled list if present
-        const state = this.stateManager.getState();
-        const disabled = state.disabledProfileSkills[item.profileId] ?? [];
+        const disabled = this.stateManager.getDisabledProfileSkills(item.profileId);
         await this.stateManager.setDisabledProfileSkills(
             item.profileId,
             disabled.filter(s => s !== item.fileName)
@@ -563,7 +561,7 @@ export class CommandRegistry {
                 await this.stateManager.toggleExtra(fileNameRef, false);
                 // Restore enabled/disabled state
                 if (!wasEnabledRef) {
-                    const currentDisabled = this.stateManager.getState().disabledProfileSkills[profileIdRef] ?? [];
+                    const currentDisabled = this.stateManager.getDisabledProfileSkills(profileIdRef);
                     if (!currentDisabled.includes(fileNameRef)) {
                         currentDisabled.push(fileNameRef);
                         await this.stateManager.setDisabledProfileSkills(profileIdRef, currentDisabled);
@@ -858,26 +856,26 @@ export class CommandRegistry {
     // --- Settings ---
 
     private async openSettings(): Promise<void> {
-        const config = this.stateManager.getConfig();
-        const currentIdeKey = this.stateManager.getCurrentIdeKey();
+        const globalConfig = this.stateManager.getGlobalConfig();
+        const ideConfig = this.stateManager.getIdeConfig();
         const currentIdeName = this.stateManager.getCurrentIdeName();
 
         await SettingsWebviewPanel.create(
             this.extensionUri,
-            config,
-            currentIdeKey,
+            globalConfig,
+            ideConfig,
             currentIdeName,
-            async (newConfig) => {
-                const oldLanguage = this.stateManager.getConfig().language;
-                await this.stateManager.updateConfig({
-                    targetPaths: newConfig.targetPaths,
-                    storagePath: newConfig.storagePath,
-                    language: newConfig.language,
+            async (newGlobalConfig, newIdeConfig) => {
+                const oldLanguage = this.stateManager.getGlobalConfig().language;
+                await this.stateManager.updateGlobalConfig({
+                    storagePath: newGlobalConfig.storagePath,
+                    language: newGlobalConfig.language,
                 });
+                await this.stateManager.setTargetPath(newIdeConfig.targetPath);
 
                 // Update i18n if language changed
-                if (newConfig.language !== oldLanguage) {
-                    setLanguage(newConfig.language);
+                if (newGlobalConfig.language !== oldLanguage) {
+                    setLanguage(newGlobalConfig.language);
                     this.showBriefMessage(t('msgLanguageUpdated'));
                 }
 

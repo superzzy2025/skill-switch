@@ -16,7 +16,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await stateManager.initialize(vscode.env.appName);
 
     // Initialize i18n with saved language
-    initI18n(stateManager.getConfig().language);
+    initI18n(stateManager.getGlobalConfig().language);
 
     const profileManager = new ProfileManager(stateManager.getProfilesPath());
     const extraManager = new ExtraManager(stateManager.getExtrasPath());
@@ -81,9 +81,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         const active = profiles.find(p => p.meta.id === currentState.activeProfile);
         if (active) {
-            const disabledSkills = currentState.disabledProfileSkills[active.meta.id] ?? [];
+            const disabledSkills = stateManager.getDisabledProfileSkills(active.meta.id);
             const enabledSkillCount = active.skillFiles.length - disabledSkills.length;
-            const extraCount = currentState.enabledExtras.length;
+            const extraCount = stateManager.getEnabledExtras().length;
             const extraPart = extraCount > 0 ? ` + ${extraCount} ${t('sectionPermanentSkills').toLowerCase()}` : '';
             statusBarItem.text = `$(sparkle) ${active.meta.name} | ${enabledSkillCount}${extraPart}`;
         }
@@ -135,9 +135,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Update status bar
     const active = profiles.find(p => p.meta.id === state.activeProfile);
     if (active) {
-        const disabledSkills = state.disabledProfileSkills[active.meta.id] ?? [];
+        const disabledSkills = stateManager.getDisabledProfileSkills(active.meta.id);
         const enabledSkillCount = active.skillFiles.length - disabledSkills.length;
-        const extraCount = state.enabledExtras.length;
+        const extraCount = stateManager.getEnabledExtras().length;
         const extraPart = extraCount > 0 ? ` + ${extraCount} ${t('sectionPermanentSkills').toLowerCase()}` : '';
         statusBarItem.text = `$(sparkle) ${active.meta.name} | ${enabledSkillCount}${extraPart}`;
     } else {

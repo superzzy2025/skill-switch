@@ -1,27 +1,27 @@
 import * as vscode from 'vscode';
-import { AppConfig, Language } from '../types';
+import { GlobalConfig, IdeConfig, Language } from '../types';
 import { t, getCurrentLanguage } from '../i18n';
 
 export class SettingsWebviewPanel {
     public static currentPanel: SettingsWebviewPanel | undefined;
     private readonly panel: vscode.WebviewPanel;
-    private config: AppConfig;
-    private currentIdeKey: string;
+    private globalConfig: GlobalConfig;
+    private ideConfig: IdeConfig;
     private currentIdeName: string;
     private disposables: vscode.Disposable[] = [];
-    private onSaved: ((config: AppConfig) => Promise<void>) | undefined;
+    private onSaved: ((globalConfig: GlobalConfig, ideConfig: IdeConfig) => Promise<void>) | undefined;
 
     public static async create(
         extensionUri: vscode.Uri,
-        config: AppConfig,
-        currentIdeKey: string,
+        globalConfig: GlobalConfig,
+        ideConfig: IdeConfig,
         currentIdeName: string,
-        onSaved: (config: AppConfig) => Promise<void>,
+        onSaved: (globalConfig: GlobalConfig, ideConfig: IdeConfig) => Promise<void>,
     ): Promise<SettingsWebviewPanel> {
         // If panel already exists, reveal it
         if (SettingsWebviewPanel.currentPanel) {
-            SettingsWebviewPanel.currentPanel.config = config;
-            SettingsWebviewPanel.currentPanel.currentIdeKey = currentIdeKey;
+            SettingsWebviewPanel.currentPanel.globalConfig = globalConfig;
+            SettingsWebviewPanel.currentPanel.ideConfig = ideConfig;
             SettingsWebviewPanel.currentPanel.currentIdeName = currentIdeName;
             SettingsWebviewPanel.currentPanel.onSaved = onSaved;
             SettingsWebviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.One);
@@ -43,8 +43,8 @@ export class SettingsWebviewPanel {
         SettingsWebviewPanel.currentPanel = new SettingsWebviewPanel(
             panel,
             extensionUri,
-            config,
-            currentIdeKey,
+            globalConfig,
+            ideConfig,
             currentIdeName,
             onSaved,
         );
@@ -55,14 +55,14 @@ export class SettingsWebviewPanel {
     private constructor(
         panel: vscode.WebviewPanel,
         _extensionUri: vscode.Uri,
-        config: AppConfig,
-        currentIdeKey: string,
+        globalConfig: GlobalConfig,
+        ideConfig: IdeConfig,
         currentIdeName: string,
-        onSaved: (config: AppConfig) => Promise<void>,
+        onSaved: (globalConfig: GlobalConfig, ideConfig: IdeConfig) => Promise<void>,
     ) {
         this.panel = panel;
-        this.config = config;
-        this.currentIdeKey = currentIdeKey;
+        this.globalConfig = globalConfig;
+        this.ideConfig = ideConfig;
         this.currentIdeName = currentIdeName;
         this.onSaved = onSaved;
 
@@ -103,7 +103,7 @@ export class SettingsWebviewPanel {
     }
 
     private async handleBrowseTargetPath(): Promise<void> {
-        const currentPath = this.config.targetPaths[this.currentIdeKey] ?? '';
+        const currentPath = this.ideConfig.targetPath ?? '';
         const uris = await vscode.window.showOpenDialog({
             canSelectMany: false,
             canSelectFiles: false,
@@ -113,10 +113,7 @@ export class SettingsWebviewPanel {
         });
         if (uris && uris.length > 0) {
             const selectedPath = uris[0].fsPath;
-            this.config = {
-                ...this.config,
-                targetPaths: { ...this.config.targetPaths, [this.currentIdeKey]: selectedPath },
-            };
+            this.ideConfig = { ...this.ideConfig, targetPath: selectedPath };
             this.panel.webview.postMessage({ command: 'updateTargetPath', value: selectedPath });
         }
     }
@@ -127,33 +124,36 @@ export class SettingsWebviewPanel {
             canSelectFiles: false,
             canSelectFolders: true,
             title: t('storagePathLabel'),
-            defaultUri: vscode.Uri.file(this.config.storagePath),
+            defaultUri: vscode.Uri.file(this.globalConfig.storagePath),
         });
         if (result && result.length > 0) {
             const newPath = result[0].fsPath;
-            this.config = { ...this.config, storagePath: newPath };
+            this.globalConfig = { ...this.globalConfig, storagePath: newPath };
             this.panel.webview.postMessage({ command: 'updateStoragePath', value: newPath });
         }
     }
 
     private async handleSave(data: { targetPath: string; storagePath: string; language: string }): Promise<void> {
-        // Update config with webview input values
-        this.config = {
-            ...this.config,
-            targetPaths: { ...this.config.targetPaths, [this.currentIdeKey]: data.targetPath },
+        // Update configs with webview input values
+        this.globalConfig = {
+            ...this.globalConfig,
             storagePath: data.storagePath,
             language: data.language as Language,
         };
+        this.ideConfig = {
+            ...this.ideConfig,
+            targetPath: data.targetPath,
+        };
         if (this.onSaved) {
-            await this.onSaved(this.config);
+            await this.onSaved(this.globalConfig, this.ideConfig);
         }
         vscode.window.showInformationMessage(t('msgSettingsSaved'));
     }
 
     private getHtmlForWebview(): string {
         const lang = getCurrentLanguage();
-        const config = this.config;
-        const currentTargetPath = config.targetPaths[this.currentIdeKey] ?? '';
+        const globalConfig = this.globalConfig;
+        const currentTargetPath = this.ideConfig.targetPath ?? '';
 
         return /*html*/ `
 <!DOCTYPE html>
@@ -335,7 +335,7 @@ export class SettingsWebviewPanel {
         <div class="section-desc">${t('storagePathHint')}</div>
         <div class="divider"></div>
         <div class="input-row">
-            <input type="text" id="storagePath" value="${this.escapeHtml(config.storagePath)}" aria-label="${t('storagePathLabel')}" />
+            <input type="text" id="storagePath" value="${this.escapeHtml(globalConfig.storagePath)}" aria-label="${t('storagePathLabel')}" />
             <button class="browse-btn" onclick="browseStoragePath()">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -364,8 +364,8 @@ export class SettingsWebviewPanel {
             </div>
             <div class="select-wrapper">
                 <select id="language" aria-label="${t('displayLanguageLabel')}">
-                    <option value="en" ${config.language === 'en' ? 'selected' : ''}>${t('langEn')}</option>
-                    <option value="zh" ${config.language === 'zh' ? 'selected' : ''}>${t('langZh')}</option>
+                    <option value="en" ${globalConfig.language === 'en' ? 'selected' : ''}>${t('langEn')}</option>
+                    <option value="zh" ${globalConfig.language === 'zh' ? 'selected' : ''}>${t('langZh')}</option>
                 </select>
             </div>
             <div class="language-hint">${t('languageHint')}</div>

@@ -10,7 +10,7 @@ import {
 
 export class SyncService {
     /**
-     * Sync skill directories to the target path based on current state.
+     * Sync skill directories to the target path based on current IDE's state.
      * Returns the count of active skills and extras.
      */
     async sync(
@@ -61,7 +61,8 @@ export class SyncService {
             }
 
             // Copy enabled extras as skill directories (extras override profile skills on conflict)
-            for (const extraSkill of state.enabledExtras) {
+            const enabledExtras = state.enabledExtras;
+            for (const extraSkill of enabledExtras) {
                 const srcPath = path.join(extrasPath, extraSkill);
                 if (await pathExists(srcPath)) {
                     await copyDirRecursive(srcPath, path.join(targetPath, extraSkill));
@@ -70,7 +71,7 @@ export class SyncService {
 
             // Count active skills
             const activeSkills = await listSkillDirectories(targetPath);
-            const extraCount = state.enabledExtras.length;
+            const extraCount = enabledExtras.length;
             const skillCount = activeSkills.length - extraCount;
 
             // Clean up backup
