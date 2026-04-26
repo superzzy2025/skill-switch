@@ -19,6 +19,10 @@
 - **Bilingual UI**: Full support for English and Chinese (中文).
 - **Real-time Sync**: Changes are synced to your configured target path immediately.
 
+### Screenshot
+
+![Skill Switch Screenshot](media/image.png)
+
 ### Quick Start
 
 1. Open the **Skill Switch** view from the Activity Bar.
@@ -58,6 +62,10 @@
 - **备份与恢复**：为配置创建快照，随时恢复。
 - **双语界面**：完整支持英文和中文。
 - **实时同步**：更改会立即同步到已配置的目标路径。
+
+### 界面预览
+
+![Skill Switch Screenshot](media/image.png)
 
 ### 快速开始
 
