@@ -56,7 +56,7 @@ export async function listSkillDirectories(dirPath: string): Promise<string[]> {
 
 /**
  * Copy an entire directory tree from srcDir to destDir recursively.
- * Excludes _meta.json at the root level.
+ * Note: _meta.json files are NOT excluded — callers must handle this if needed.
  */
 export async function copyDirRecursive(srcDir: string, destDir: string): Promise<void> {
     await ensureDir(destDir);
@@ -82,14 +82,4 @@ export async function removeDir(dirPath: string): Promise<void> {
     }
 }
 
-/** Backup all files in a directory to a temp backup directory (recursive) */
-export async function backupDir(srcDir: string, backupDirPath: string): Promise<void> {
-    await clearDirRecursive(backupDirPath);
-    await copyDirRecursive(srcDir, backupDirPath);
-}
 
-/** Restore all files from a backup directory to target (recursive) */
-export async function restoreBackup(backupDirPath: string, targetDir: string): Promise<void> {
-    await clearDirRecursive(targetDir);
-    await copyDirRecursive(backupDirPath, targetDir);
-}

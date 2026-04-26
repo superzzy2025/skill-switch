@@ -281,6 +281,12 @@ export class SettingsWebviewPanel {
         .btn-save { display: flex; align-items: center; gap: 6px; color: #fff; background: var(--vscode-blue); }
         .btn-save:hover { background: var(--vscode-blue-hover); }
         .btn-save .icon { width: 14px; height: 14px; }
+
+        @media (max-width: 600px) {
+            body { padding: 16px 20px; }
+            .section { padding: 14px; }
+            .title-row h1 { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -308,7 +314,7 @@ export class SettingsWebviewPanel {
             ${this.escapeHtml(this.currentIdeName)}
         </div>
         <div class="input-row">
-            <input type="text" id="targetPath" value="${this.escapeHtml(currentTargetPath)}" />
+            <input type="text" id="targetPath" value="${this.escapeHtml(currentTargetPath)}" aria-label="${t('targetPathLabel')} - ${this.escapeHtml(this.currentIdeName)}" />
             <button class="browse-btn" onclick="browseTargetPath()">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -329,7 +335,7 @@ export class SettingsWebviewPanel {
         <div class="section-desc">${t('storagePathHint')}</div>
         <div class="divider"></div>
         <div class="input-row">
-            <input type="text" id="storagePath" value="${this.escapeHtml(config.storagePath)}" />
+            <input type="text" id="storagePath" value="${this.escapeHtml(config.storagePath)}" aria-label="${t('storagePathLabel')}" />
             <button class="browse-btn" onclick="browseStoragePath()">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -357,7 +363,7 @@ export class SettingsWebviewPanel {
                 <label>${t('displayLanguageLabel')}</label>
             </div>
             <div class="select-wrapper">
-                <select id="language">
+                <select id="language" aria-label="${t('displayLanguageLabel')}">
                     <option value="en" ${config.language === 'en' ? 'selected' : ''}>${t('langEn')}</option>
                     <option value="zh" ${config.language === 'zh' ? 'selected' : ''}>${t('langZh')}</option>
                 </select>

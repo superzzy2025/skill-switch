@@ -72,8 +72,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         // Refresh tree and status bar
         const allProfiles = await profileManager.listProfiles();
-        const profiles = allProfiles.filter(p => !(p.meta as any).isBackup);
-        const backups = allProfiles.filter(p => (p.meta as any).isBackup === true);
+        const profiles = allProfiles.filter(p => !p.meta.isBackup);
+        const backups = allProfiles.filter(p => p.meta.isBackup === true);
         const extras = await extraManager.listExtras();
         const designDocs = await designDocManager.listDesignDocs();
         const currentState = stateManager.getState();
@@ -104,7 +104,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Auto-import skills from targetPath if no profiles exist
     let allProfiles = await profileManager.listProfiles();
-    let profiles = allProfiles.filter(p => !(p.meta as any).isBackup);
+    let profiles = allProfiles.filter(p => !p.meta.isBackup);
     if (profiles.length === 0 && stateManager.hasTargetPath()) {
         const targetPath = stateManager.getTargetPath();
         const count = await importSkillsFromTarget(
@@ -118,7 +118,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 1000
             );
             allProfiles = await profileManager.listProfiles();
-            profiles = allProfiles.filter(p => !(p.meta as any).isBackup);
+            profiles = allProfiles.filter(p => !p.meta.isBackup);
             // Auto-activate the imported profile
             if (profiles.length > 0 && !stateManager.getActiveProfile()) {
                 await stateManager.setActiveProfile(profiles[0].meta.id);
@@ -126,7 +126,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
     }
 
-    const backups = allProfiles.filter(p => (p.meta as any).isBackup === true);
+    const backups = allProfiles.filter(p => p.meta.isBackup === true);
     const extras = await extraManager.listExtras();
     const designDocs = await designDocManager.listDesignDocs();
     const state = stateManager.getState();

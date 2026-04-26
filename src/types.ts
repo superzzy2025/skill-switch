@@ -47,10 +47,20 @@ export interface LegacyAppConfig {
     language: Language;
 }
 
+/** A skill entry with its directory name and display metadata */
+export interface ResolvedSkill {
+    /** Directory name, e.g. "react-patterns" */
+    fileName: string;
+    /** Display name from SKILL.md frontmatter, falls back to fileName */
+    name: string;
+    /** Description from SKILL.md frontmatter */
+    description: string;
+}
+
 /** A fully resolved profile with its meta and skill files */
 export interface ResolvedProfile {
     meta: ProfileMeta;
-    skillFiles: string[];  // skill directory names, e.g. "react-patterns"
+    skillFiles: ResolvedSkill[];
 }
 
 /** Full app data for the tree to render */

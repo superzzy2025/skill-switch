@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { ProfileMeta, ResolvedProfile } from '../types';
+import { ProfileMeta, ResolvedProfile, ResolvedSkill } from '../types';
 import {
     ensureDir, pathExists, readJsonFile, writeJsonFile,
     listSkillDirectories, copyDirRecursive, removeDir
@@ -24,7 +24,17 @@ export class ProfileManager {
                 continue;
             }
             const meta = await this.getProfileMeta(name);
-            const skillFiles = await listSkillDirectories(path.join(this.profilesPath, name));
+            const dirNames = await listSkillDirectories(path.join(this.profilesPath, name));
+            const skillFiles: ResolvedSkill[] = await Promise.all(
+                dirNames.map(async (fileName) => {
+                    const skillMeta = await this.readSkillMdMeta(path.join(this.profilesPath, name, fileName));
+                    return {
+                        fileName,
+                        name: skillMeta.name || fileName,
+                        description: skillMeta.description,
+                    };
+                })
+            );
             profiles.push({
                 meta: meta ?? {
                     id: name,
@@ -75,7 +85,17 @@ export class ProfileManager {
         const meta: ProfileMeta = { id, name, description, createdAt: now, updatedAt: now };
         await writeJsonFile(path.join(profileDir, '_meta.json'), meta);
 
-        const skillFiles = await listSkillDirectories(profileDir);
+        const dirNames = await listSkillDirectories(profileDir);
+        const skillFiles: ResolvedSkill[] = await Promise.all(
+            dirNames.map(async (fileName) => {
+                const skillMeta = await this.readSkillMdMeta(path.join(profileDir, fileName));
+                return {
+                    fileName,
+                    name: skillMeta.name || fileName,
+                    description: skillMeta.description,
+                };
+            })
+        );
         return { meta, skillFiles };
     }
 
@@ -174,5 +194,26 @@ export class ProfileManager {
             counter++;
         }
         return id;
+    }
+
+    /** Read frontmatter from SKILL.md in a skill directory */
+    async readSkillMdMeta(skillDir: string): Promise<{ name: string; description: string }> {
+        const skillMdPath = path.join(skillDir, 'SKILL.md');
+        try {
+            const content = await fs.promises.readFile(skillMdPath, 'utf-8');
+            const match = content.match(/^---\n([\s\S]*?)\n---/);
+            if (match) {
+                const frontmatter = match[1];
+                const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+                const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
+                return {
+                    name: nameMatch?.[1]?.trim() || '',
+                    description: descMatch?.[1]?.trim() || '',
+                };
+            }
+        } catch {
+            // File doesn't exist or can't be read
+        }
+        return { name: '', description: '' };
     }
 }

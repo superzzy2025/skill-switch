@@ -117,11 +117,6 @@ export class DesignDocManager {
         return path.join(this.designDocsPath, docName);
     }
 
-    /** Get the full path to a design document directory for editing */
-    getDesignDocPath(docName: string): string {
-        return path.join(this.designDocsPath, docName);
-    }
-
     /** Read the design docs metadata file */
     private async readMeta(): Promise<DesignDocsMeta> {
         const meta = await readJsonFile<DesignDocsMeta>(this.metaPath);

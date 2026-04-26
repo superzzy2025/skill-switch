@@ -10,7 +10,7 @@ import { SyncService } from '../services/syncService';
 import { SkillTreeProvider, ProfileItem, ProfileSkillItem, PermanentSkillItem, BackupProfileItem, DesignDocItem, DesignDocFolderItem } from '../tree/SkillTreeProvider';
 import { AppData, Language } from '../types';
 import { SettingsWebviewPanel } from '../webview/SettingsWebviewPanel';
-import { t, setLanguage, getCurrentLanguage } from '../i18n';
+import { t, setLanguage } from '../i18n';
 import { pathExists, listSkillDirectories, copyDirRecursive, ensureDir, removeDir } from '../utils/fileUtils';
 
 export class CommandRegistry {
@@ -30,14 +30,10 @@ export class CommandRegistry {
         vscode.window.setStatusBarMessage(message, 1000);
     }
 
-    /** Show an information message with undo and close buttons, auto-dismisses after 5 seconds */
+    /** Show an information message with undo and close buttons */
     private async showUndoMessage(message: string, undoLabel: string, onUndo: () => Promise<void>): Promise<void> {
         const close = t('msgClose');
-        const resultPromise = vscode.window.showInformationMessage(message, undoLabel, close);
-        const timeoutPromise = new Promise<string | undefined>(resolve =>
-            setTimeout(() => resolve(undefined), 5000)
-        );
-        const result = await Promise.race([resultPromise, timeoutPromise]);
+        const result = await vscode.window.showInformationMessage(message, undoLabel, close);
         if (result === undoLabel) {
             await onUndo();
         }
@@ -95,8 +91,8 @@ export class CommandRegistry {
     /** Load full app data for the tree */
     private async loadAppData(): Promise<AppData> {
         const allProfiles = await this.profileManager.listProfiles();
-        const profiles = allProfiles.filter(p => !(p.meta as any).isBackup);
-        const backups = allProfiles.filter(p => (p.meta as any).isBackup === true);
+        const profiles = allProfiles.filter(p => !p.meta.isBackup);
+        const backups = allProfiles.filter(p => p.meta.isBackup === true);
         const extras = await this.extraManager.listExtras();
         const designDocs = await this.designDocManager.listDesignDocs();
         const state = this.stateManager.getState();
@@ -355,7 +351,6 @@ export class CommandRegistry {
         const tempBackupDir = path.join(os.tmpdir(), 'skill-switch-undo', `${item.profileId}-${item.fileName}`);
         await ensureDir(path.dirname(tempBackupDir));
         await copyDirRecursive(skillDir, tempBackupDir);
-        const skillMeta = await this.readSkillMdMeta(skillDir);
         const wasEnabled = !(this.stateManager.getState().disabledProfileSkills[item.profileId] ?? []).includes(item.fileName);
 
         await this.profileManager.removeSkill(item.profileId, item.fileName);
@@ -520,7 +515,7 @@ export class CommandRegistry {
     /** Move a skill from its profile to permanent skills */
     private async moveToPermanent(item: ProfileSkillItem): Promise<void> {
         const skillDir = this.profileManager.getSkillDirPath(item.profileId, item.fileName);
-        const skillMeta = await this.readSkillMdMeta(skillDir);
+        const skillMeta = await this.profileManager.readSkillMdMeta(skillDir);
 
         if (await this.extraManager.extraExists(item.fileName)) {
             vscode.window.showWarningMessage(t('msgSkillAlreadyExists', item.fileName));
@@ -586,7 +581,7 @@ export class CommandRegistry {
     /** Move a permanent skill to a user-chosen profile */
     private async moveExtraToProfile(item: PermanentSkillItem): Promise<void> {
         const profiles = await this.profileManager.listProfiles();
-        const nonBackupProfiles = profiles.filter(p => !(p.meta as any).isBackup);
+        const nonBackupProfiles = profiles.filter(p => !p.meta.isBackup);
         if (nonBackupProfiles.length === 0) {
             vscode.window.showWarningMessage(t('msgNoProfileActive'));
             return;
@@ -624,7 +619,7 @@ export class CommandRegistry {
     /** Copy a permanent skill to a user-chosen profile */
     private async copyExtraToProfile(item: PermanentSkillItem): Promise<void> {
         const profiles = await this.profileManager.listProfiles();
-        const nonBackupProfiles = profiles.filter(p => !(p.meta as any).isBackup);
+        const nonBackupProfiles = profiles.filter(p => !p.meta.isBackup);
         if (nonBackupProfiles.length === 0) {
             vscode.window.showWarningMessage(t('msgNoProfileActive'));
             return;
@@ -896,7 +891,7 @@ export class CommandRegistry {
     private async importFromTarget(): Promise<void> {
         // Step 1: Choose target - create new profile or import into existing
         const profiles = await this.profileManager.listProfiles();
-        const nonBackupProfiles = profiles.filter(p => !(p.meta as any).isBackup);
+        const nonBackupProfiles = profiles.filter(p => !p.meta.isBackup);
         const targetItems: { label: string; description?: string; profileId?: string }[] = [
             { label: t('msgImportNewProfile'), description: t('msgImportNewProfileDesc') },
             ...nonBackupProfiles.map(p => ({
@@ -934,10 +929,11 @@ export class CommandRegistry {
         }
 
         // Step 2: Choose source - from target path or from custom directory
-        const sourceItems: { label: string; description: string; sourceType: 'target' | 'custom' }[] = [
-            { label: t('msgImportFromTarget'), description: this.stateManager.getTargetPath(), sourceType: 'target' },
-            { label: t('msgImportFromDir'), description: t('msgImportFromDirDesc'), sourceType: 'custom' },
-        ];
+        const sourceItems: { label: string; description: string; sourceType: 'target' | 'custom' }[] = [];
+        if (this.stateManager.hasTargetPath()) {
+            sourceItems.push({ label: t('msgImportFromTarget'), description: this.stateManager.getTargetPath(), sourceType: 'target' });
+        }
+        sourceItems.push({ label: t('msgImportFromDir'), description: t('msgImportFromDirDesc'), sourceType: 'custom' });
 
         const sourceSelected = await vscode.window.showQuickPick(sourceItems, {
             placeHolder: t('msgImportChooseSource'),
@@ -1042,7 +1038,7 @@ export class CommandRegistry {
         const id = await this.profileManager.generateUniqueId(backupName);
         await this.profileManager.createProfile(id, backupName, `${t('msgBackupOf', meta.name)}`, item.profileId);
         // Mark as backup
-        await this.profileManager.updateProfile(id, { isBackup: true, backupOf: item.profileId } as any);
+        await this.profileManager.updateProfile(id, { isBackup: true, backupOf: item.profileId });
 
         this.showBriefMessage(
             t('msgBackupSuccess', meta.name, backupName)
@@ -1054,7 +1050,7 @@ export class CommandRegistry {
     private async restoreProfile(): Promise<void> {
         // List backup profiles
         const profiles = await this.profileManager.listProfiles();
-        const backups = profiles.filter(p => (p.meta as any).isBackup === true);
+        const backups = profiles.filter(p => p.meta.isBackup === true);
 
         if (backups.length === 0) {
             vscode.window.showWarningMessage(t('msgNoBackups'));
@@ -1083,8 +1079,8 @@ export class CommandRegistry {
         const name = await vscode.window.showInputBox({
             prompt: t('msgRestoreProfileName'),
             placeHolder: t('msgRestoreProfileNamePlaceholder'),
-            value: (backupProfile.meta as any).backupOf
-                ? (profiles.find(p => p.meta.id === (backupProfile.meta as any).backupOf)?.meta.name ?? backupProfile.meta.name)
+            value: backupProfile.meta.backupOf
+                ? (profiles.find(p => p.meta.id === backupProfile.meta.backupOf)?.meta.name ?? backupProfile.meta.name)
                 : backupProfile.meta.name,
         });
         if (!name) {
@@ -1107,48 +1103,4 @@ export class CommandRegistry {
         await this.refresh();
     }
 
-    // --- SKILL.md Frontmatter Helpers ---
-
-    /** Read frontmatter from SKILL.md in a skill directory */
-    private async readSkillMdMeta(skillDir: string): Promise<{ name: string; description: string }> {
-        const skillMdPath = path.join(skillDir, 'SKILL.md');
-        try {
-            const content = await fs.promises.readFile(skillMdPath, 'utf-8');
-            const match = content.match(/^---\n([\s\S]*?)\n---/);
-            if (match) {
-                const frontmatter = match[1];
-                const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
-                const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
-                return {
-                    name: nameMatch?.[1]?.trim() || '',
-                    description: descMatch?.[1]?.trim() || '',
-                };
-            }
-        } catch {
-            // File doesn't exist or can't be read
-        }
-        return { name: '', description: '' };
-    }
-
-    /** Write frontmatter back to SKILL.md */
-    private async writeSkillMdMeta(skillDir: string, meta: { name: string; description: string }): Promise<void> {
-        const skillMdPath = path.join(skillDir, 'SKILL.md');
-        let content = '';
-        try {
-            content = await fs.promises.readFile(skillMdPath, 'utf-8');
-        } catch {
-            content = `---\nname: ${meta.name}\ndescription: ${meta.description}\n---\n\n# ${meta.name}\n\n`;
-            await fs.promises.writeFile(skillMdPath, content, 'utf-8');
-            return;
-        }
-
-        // Replace or add frontmatter
-        const frontmatter = `---\nname: ${meta.name}\ndescription: ${meta.description}\n---`;
-        if (content.match(/^---\n[\s\S]*?\n---/)) {
-            content = content.replace(/^---\n[\s\S]*?\n---/, frontmatter);
-        } else {
-            content = `${frontmatter}\n\n${content}`;
-        }
-        await fs.promises.writeFile(skillMdPath, content, 'utf-8');
-    }
 }

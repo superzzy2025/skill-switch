@@ -5,6 +5,8 @@ import { AppData, ExtraSkillMeta } from '../types';
 import { DesignDocMeta } from '../services/designDocManager';
 import { t } from '../i18n';
 
+type ProviderResult<T> = vscode.ProviderResult<T>;
+
 // --- Tree Item Classes ---
 
 export class ProfileItem extends vscode.TreeItem {
@@ -199,7 +201,7 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
         return element;
     }
 
-    getChildren(element?: SkillTreeItem): SkillTreeItem[] {
+    getChildren(element?: SkillTreeItem): ProviderResult<SkillTreeItem[]> {
         if (!this.data) {
             return [];
         }
@@ -243,12 +245,12 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
                 return [];
             }
             const disabledSkills = this.data.state.disabledProfileSkills[element.profileId] ?? [];
-            return profile.skillFiles.map(fileName => new ProfileSkillItem(
+            return profile.skillFiles.map(skill => new ProfileSkillItem(
                 element.profileId,
-                fileName,
-                fileName,
-                '',
-                !disabledSkills.includes(fileName)
+                skill.fileName,
+                skill.name,
+                skill.description,
+                !disabledSkills.includes(skill.fileName)
             ));
         }
 
@@ -268,11 +270,11 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
             if (!backup) {
                 return [];
             }
-            return backup.skillFiles.map(fileName => new ProfileSkillItem(
+            return backup.skillFiles.map(skill => new ProfileSkillItem(
                 element.profileId,
-                fileName,
-                fileName,
-                '',
+                skill.fileName,
+                skill.name,
+                skill.description,
                 true  // backup skills are always shown as enabled (read-only)
             ));
         }
@@ -286,16 +288,7 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
         }
 
         if (element instanceof DesignDocHeaderItem) {
-            return this.data.designDocs.map(({ dirname, meta }) => {
-                const docDir = path.join(this.designDocsPath, dirname);
-                let childCount = 0;
-                try {
-                    childCount = this.countChildren(docDir);
-                } catch {
-                    // directory doesn't exist
-                }
-                return new DesignDocItem(dirname, meta, childCount);
-            });
+            return this.buildDesignDocItems();
         }
 
         if (element instanceof DesignDocItem) {
@@ -310,10 +303,22 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
         return [];
     }
 
+    /** Build DesignDocItem array with async child counting */
+    private async buildDesignDocItems(): Promise<DesignDocItem[]> {
+        if (!this.data) { return []; }
+        const items: DesignDocItem[] = [];
+        for (const { dirname, meta } of this.data.designDocs) {
+            const docDir = path.join(this.designDocsPath, dirname);
+            const childCount = await this.countChildren(docDir);
+            items.push(new DesignDocItem(dirname, meta, childCount));
+        }
+        return items;
+    }
+
     /** Count children (files + directories) in a directory, excluding hidden files and _meta.json */
-    private countChildren(dirPath: string): number {
+    private async countChildren(dirPath: string): Promise<number> {
         try {
-            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
             return entries.filter(e => !e.name.startsWith('.') && e.name !== '_meta.json').length;
         } catch {
             return 0;
@@ -321,9 +326,9 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
     }
 
     /** Get children (files and subdirectories) for a design document directory */
-    private getDirChildren(docName: string, dirPath: string): (DesignDocFolderItem | DesignDocFileItem)[] {
+    private async getDirChildren(docName: string, dirPath: string): Promise<(DesignDocFolderItem | DesignDocFileItem)[]> {
         try {
-            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
             const items: (DesignDocFolderItem | DesignDocFileItem)[] = [];
             // Sort: directories first, then files, both alphabetically
             const sortedEntries = entries
@@ -336,7 +341,7 @@ export class SkillTreeProvider implements vscode.TreeDataProvider<SkillTreeItem>
             for (const entry of sortedEntries) {
                 const entryPath = path.join(dirPath, entry.name);
                 if (entry.isDirectory()) {
-                    const childCount = this.countChildren(entryPath);
+                    const childCount = await this.countChildren(entryPath);
                     items.push(new DesignDocFolderItem(docName, entryPath, entry.name, childCount));
                 } else {
                     items.push(new DesignDocFileItem(docName, entry.name, entryPath));
