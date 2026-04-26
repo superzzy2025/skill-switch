@@ -6,7 +6,7 @@
 
 ## English
 
-**Skill Switch** is a VS Code extension that helps you manage and switch between different AI skill configurations — perfect for CodeBuddy, Claude, and other AI coding tools that rely on skill/prompt files.
+**Skill Switch** is a VS Code extension for switching between different skill systems. For example, when using systems like superpowers, immcapbble, etc., which are difficult to merge with each other and would make the skills folder bloated if placed together.
 
 ### Features
 
@@ -50,7 +50,7 @@
 
 ## 中文
 
-**Skill Switch** 是一个 VS Code 扩展，帮助你管理和切换不同的 AI 技能配置——非常适合 CodeBuddy、Claude 和其他依赖技能/提示词文件的 AI 编程工具。
+**Skill Switch** 是一个 VS Code 扩展，用于在不同体系的SKILL中来回切换。例如superpowers、immcapbble等难以互相融合且同时将其置入skills文件夹内会十分臃肿的情况。
 
 ### 功能特性
 
