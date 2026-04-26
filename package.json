@@ -1,0 +1,104 @@
+{
+  "name": "skill-switch",
+  "displayName": "%ext.displayName%",
+  "description": "%ext.description%",
+  "version": "0.1.0",
+  "publisher": "skill-switch",
+  "engines": {
+    "vscode": "^1.87.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onView:skillSwitchView"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "skill-switch",
+          "title": "%ext.viewContainerTitle%",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "skill-switch": [
+        {
+          "id": "skillSwitchView",
+          "name": "%ext.viewName%",
+          "type": "tree"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "skillSwitch.createProfile", "title": "%cmd.createProfile%", "icon": "$(add)" },
+      { "command": "skillSwitch.deleteProfile", "title": "%cmd.delete%", "icon": "$(trash)" },
+      { "command": "skillSwitch.editProfile", "title": "%cmd.edit%", "icon": "$(edit)" },
+      { "command": "skillSwitch.switchProfile", "title": "%cmd.switch%", "icon": "$(check)" },
+      { "command": "skillSwitch.addSkillToProfile", "title": "%cmd.addSkill%", "icon": "$(add)" },
+      { "command": "skillSwitch.removeSkillFromProfile", "title": "%cmd.remove%", "icon": "$(close)" },
+      { "command": "skillSwitch.editSkill", "title": "%cmd.editFile%", "icon": "$(go-to-file)" },
+      { "command": "skillSwitch.addExtra", "title": "%cmd.addPermanent%", "icon": "$(add)" },
+      { "command": "skillSwitch.removeExtra", "title": "%cmd.remove%", "icon": "$(close)" },
+      { "command": "skillSwitch.editExtra", "title": "%cmd.editFile%", "icon": "$(go-to-file)" },
+      { "command": "skillSwitch.moveToPermanent", "title": "%cmd.moveToPermanent%", "icon": "$(arrow-up)" },
+      { "command": "skillSwitch.moveExtraToProfile", "title": "%cmd.moveToProfile%", "icon": "$(arrow-right)" },
+      { "command": "skillSwitch.copyExtraToProfile", "title": "%cmd.copyToProfile%", "icon": "$(copy)" },
+      { "command": "skillSwitch.addDesignDoc", "title": "%cmd.addDesignDoc%", "icon": "$(add)" },
+      { "command": "skillSwitch.removeDesignDoc", "title": "%cmd.remove%", "icon": "$(close)" },
+      { "command": "skillSwitch.openDesignDoc", "title": "%cmd.openDesignDoc%" },
+      { "command": "skillSwitch.editDesignDocMeta", "title": "%cmd.editNameDesc%" },
+      { "command": "skillSwitch.openInExplorer", "title": "%cmd.openInExplorer%" },
+      { "command": "skillSwitch.deleteDesignDocFolder", "title": "%cmd.delete%" },
+      { "command": "skillSwitch.newFile", "title": "%cmd.newFile%" },
+      { "command": "skillSwitch.newFolder", "title": "%cmd.newFolder%" },
+      { "command": "skillSwitch.refresh", "title": "%cmd.refresh%", "icon": "$(refresh)" },
+      { "command": "skillSwitch.openSettings", "title": "%cmd.settings%", "icon": "$(settings-gear)" },
+      { "command": "skillSwitch.importFromTarget", "title": "%cmd.importSkills%", "icon": "$(arrow-down)" },
+      { "command": "skillSwitch.backupProfile", "title": "%cmd.backup%", "icon": "$(archive)" },
+      { "command": "skillSwitch.restoreProfile", "title": "%cmd.restore%", "icon": "$(cloud-download)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "skillSwitch.createProfile", "when": "view == skillSwitchView", "group": "navigation", "icon": "$(plus)" },
+        { "command": "skillSwitch.refresh", "when": "view == skillSwitchView", "group": "navigation", "icon": "$(refresh)" },
+        { "command": "skillSwitch.openSettings", "when": "view == skillSwitchView", "group": "navigation", "icon": "$(settings-gear)" },
+        { "command": "skillSwitch.importFromTarget", "when": "view == skillSwitchView", "group": "navigation", "icon": "$(arrow-down)" },
+        { "command": "skillSwitch.restoreProfile", "when": "view == skillSwitchView", "group": "navigation", "icon": "$(cloud-download)" }
+      ],
+      "view/item/context": [
+        { "command": "skillSwitch.switchProfile", "when": "view == skillSwitchView && viewItem == profile-inactive", "group": "inline" },
+        { "command": "skillSwitch.editProfile", "when": "view == skillSwitchView && viewItem =~ /^profile-/", "group": "1_edit@1" },
+        { "command": "skillSwitch.deleteProfile", "when": "view == skillSwitchView && viewItem =~ /^profile-/", "group": "2_delete@2" },
+        { "command": "skillSwitch.backupProfile", "when": "view == skillSwitchView && viewItem =~ /^profile-active/", "group": "3_backup@1" },
+        { "command": "skillSwitch.addSkillToProfile", "when": "view == skillSwitchView && viewItem =~ /^profile-/", "group": "inline" },
+        { "command": "skillSwitch.removeSkillFromProfile", "when": "view == skillSwitchView && viewItem =~ /^skill-/", "group": "inline" },
+        { "command": "skillSwitch.editSkill", "when": "view == skillSwitchView && viewItem =~ /^skill-/", "group": "inline" },
+        { "command": "skillSwitch.moveToPermanent", "when": "view == skillSwitchView && viewItem =~ /^skill-/", "group": "inline" },
+        { "command": "skillSwitch.addExtra", "when": "view == skillSwitchView && viewItem == permanent-header", "group": "inline" },
+        { "command": "skillSwitch.removeExtra", "when": "view == skillSwitchView && viewItem =~ /^permanent-skill-/", "group": "inline" },
+        { "command": "skillSwitch.editExtra", "when": "view == skillSwitchView && viewItem =~ /^permanent-skill-/", "group": "inline" },
+        { "command": "skillSwitch.moveExtraToProfile", "when": "view == skillSwitchView && viewItem =~ /^permanent-skill-/", "group": "1_move@1" },
+        { "command": "skillSwitch.copyExtraToProfile", "when": "view == skillSwitchView && viewItem =~ /^permanent-skill-/", "group": "1_move@2" },
+        { "command": "skillSwitch.deleteProfile", "when": "view == skillSwitchView && viewItem == backup-profile", "group": "2_delete@2" },
+        { "command": "skillSwitch.addDesignDoc", "when": "view == skillSwitchView && viewItem == designdoc-header", "group": "inline" },
+        { "command": "skillSwitch.openDesignDoc", "when": "view == skillSwitchView && viewItem == designdoc-item", "group": "inline" },
+        { "command": "skillSwitch.editDesignDocMeta", "when": "view == skillSwitchView && viewItem == designdoc-item", "group": "1_edit@1" },
+        { "command": "skillSwitch.openInExplorer", "when": "view == skillSwitchView && viewItem =~ /^designdoc-(item|folder)$/", "group": "2_explore@1" },
+        { "command": "skillSwitch.newFile", "when": "view == skillSwitchView && viewItem =~ /^designdoc-(item|folder)$/", "group": "3_new@1" },
+        { "command": "skillSwitch.newFolder", "when": "view == skillSwitchView && viewItem =~ /^designdoc-(item|folder)$/", "group": "3_new@2" },
+        { "command": "skillSwitch.removeDesignDoc", "when": "view == skillSwitchView && viewItem == designdoc-item", "group": "9_delete@1" },
+        { "command": "skillSwitch.deleteDesignDocFolder", "when": "view == skillSwitchView && viewItem == designdoc-folder", "group": "9_delete@1" }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.87.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
