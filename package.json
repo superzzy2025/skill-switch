@@ -2,7 +2,7 @@
   "name": "skill-switch",
   "displayName": "%ext.displayName%",
   "description": "%ext.description%",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "skill-switch",
   "repository": {
     "type": "git",
