@@ -83,7 +83,10 @@ export class SettingsWebviewPanel {
                         await this.handleBrowseStoragePath();
                         break;
                     case 'save':
-                        await this.handleSave(msg.data);
+                        if (msg.data && typeof msg.data.targetPath === 'string' &&
+                            typeof msg.data.storagePath === 'string' && typeof msg.data.language === 'string') {
+                            await this.handleSave(msg.data);
+                        }
                         break;
                     case 'cancel':
                         this.panel.dispose();
