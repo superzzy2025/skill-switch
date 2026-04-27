@@ -5,6 +5,29 @@ All notable changes to the "Skill Switch" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-04-26
+
+### Changed
+- **Storage structure refactor**: Each IDE now has independent config and state files, preventing cross-IDE configuration conflicts.
+  - Global config stored at `~/.skill-switch/config.json` (storagePath, language)
+  - IDE-specific config at `ide/{ideKey}/config.json` (targetPath)
+  - IDE-specific state at `ide/{ideKey}/state.json` (activeProfile, disabledProfileSkills, enabledExtras, sidebarCollapsed)
+- `AppState` simplified: `disabledProfileSkills` is now `Record<string, string[]>` and `enabledExtras` is now `string[]` (no longer nested per-IDE)
+- `syncService.sync()` and `syncService.syncAndNotify()` no longer require `ideKey` parameter
+- `SkillTreeProvider` reads state directly without IDE key indexing
+- `AppData` removed `currentIdeKey` field
+- `AppConfig` split into `GlobalConfig` + `IdeConfig` for cleaner separation of concerns
+- Settings webview now receives and saves `GlobalConfig` and `IdeConfig` separately
+
+### Fixed
+- **Critical**: `initialize()` no longer unconditionally calls `saveState()`, which could overwrite disk state with empty defaults if `readJsonFile` failed transiently (file lock, IO error, JSON parse failure) — this was the root cause of unchecked skills re-appearing after IDE restart
+- Deep copy `DEFAULT_STATE` via `createDefaultState()` to prevent shared reference mutation on nested objects
+- Distinguish "file not found" (first run) vs "read failed" (error) in `initialize()` to avoid data loss
+
+### Added
+- Automatic migration from old single-file config/state format to new per-IDE directory structure
+- Diagnostic `console.error` logging when state file exists but cannot be read
+
 ## [0.1.1] - 2026-04-26
 
 ### Fixed
